@@ -1,9 +1,29 @@
 [
   {
-    "id": "1",
-    "username": "admin",
-    "password": "admin1234!",
-    "displayName": "시스템 관리자",
-    "permissions": ["reset_password", "unlock", "disable", "admin"]
+    "Id": "1",
+    "Username": "admin",
+    "Password": "Prossw0rd",
+    "DisplayName": "\uC2DC\uC2A4\uD15C \uAD00\uB9AC\uC790",
+    "Permissions": [
+      "menu_users",
+      "reset_password",
+      "unlock",
+      "disable",
+      "admin"
+    ]
+  },
+  {
+    "Id": "2dd82b63-2c96-4f76-85b9-225c8885674d",
+    "Username": "jssong",
+    "Password": "Prossw0rd",
+    "DisplayName": "\uAD00\uB9AC\uC790",
+    "Permissions": [
+      "menu_users",
+      "menu_admin",
+      "reset_password",
+      "unlock",
+      "disable",
+      "admin"
+    ]
   }
 ]
