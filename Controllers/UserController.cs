@@ -29,14 +29,10 @@ public class UserController : ControllerBase
     public async Task<IActionResult> Search(
         [FromQuery] string account,
         [FromQuery] string name,
-        [FromQuery] string groupId)
+        [FromQuery] string groupName,
+        [FromQuery] string status)
     {
-        if (string.IsNullOrWhiteSpace(account) &&
-            string.IsNullOrWhiteSpace(name) &&
-            string.IsNullOrWhiteSpace(groupId))
-            return BadRequest(new { error = "검색 조건을 하나 이상 입력하세요." });
-
-        var json = await _graph.SearchUsersAsync(account, name, groupId);
+        var json = await _graph.SearchUsersAsync(account, name, groupName, status);
 
         using (var doc = JsonDocument.Parse(json))
         {

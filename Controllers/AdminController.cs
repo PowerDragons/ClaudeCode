@@ -51,7 +51,22 @@ public class AdminController : ControllerBase
         op.Id = id;
         if (!_operators.Update(op))
             return NotFound(new { error = "관리자를 찾을 수 없습니다." });
-        return Ok(new { message = "수정되었습니다." });
+
+        // 자기 자신을 수정한 경우 세션 권한 즉시 갱신
+        var me = HttpContext.Session.GetString("username");
+        bool sessionUpdated = false;
+        if (!string.IsNullOrEmpty(op.Username) && op.Username == me)
+        {
+            var updated = _operators.GetByUsername(me);
+            if (updated != null)
+            {
+                HttpContext.Session.SetString("permissions", string.Join(",", updated.Permissions));
+                HttpContext.Session.SetString("displayName", updated.DisplayName);
+                sessionUpdated = true;
+            }
+        }
+
+        return Ok(new { message = "수정되었습니다.", sessionUpdated });
     }
 
     [HttpDelete("operators/{id}")]

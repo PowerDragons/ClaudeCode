@@ -10,36 +10,49 @@
 </head>
 <body>
 
-<!-- 네비바 -->
-<nav class="navbar navbar-dark bg-primary px-4 py-2">
-  <span class="navbar-brand fw-bold fs-6"><i class="bi bi-shield-lock-fill me-2"></i>Azure AD 사용자 관리</span>
+<!-- 상단 네비바 -->
+<nav class="navbar navbar-dark bg-primary px-3 py-2 top-navbar">
+  <div class="d-flex align-items-center gap-2">
+    <button class="btn btn-sm btn-primary border-0 me-1" id="sidebarToggle" onclick="toggleSidebar()">
+      <i class="bi bi-list fs-5"></i>
+    </button>
+    <span class="navbar-brand fw-bold fs-6 mb-0">
+      <i class="bi bi-shield-lock-fill me-2"></i>Azure AD 사용자 관리
+    </span>
+  </div>
   <div class="d-flex align-items-center gap-3">
-    <span class="text-white small"><i class="bi bi-person-circle me-1"></i><span id="navUser"></span></span>
+    <span class="text-white small"><i class="bi bi-person-circle me-1"></i><span id="navUser" class="d-none d-sm-inline"></span></span>
     <button class="btn btn-sm btn-outline-light" onclick="logout()">
       <i class="bi bi-box-arrow-right me-1"></i>로그아웃
     </button>
   </div>
 </nav>
 
-<!-- 탭 -->
-<div class="container-fluid px-4 mt-3">
-  <ul class="nav nav-tabs" id="mainTab">
-    <li class="nav-item">
-      <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-users">
-        <i class="bi bi-people me-1"></i>사용자 관리
-      </button>
-    </li>
-    <li class="nav-item" id="adminTabItem" style="display:none">
-      <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-admin">
-        <i class="bi bi-gear me-1"></i>관리자 설정
-      </button>
-    </li>
-  </ul>
+<!-- 모바일 사이드바 백드롭 -->
+<div class="sidebar-backdrop" id="sidebarBackdrop" onclick="toggleSidebar()"></div>
 
-  <div class="tab-content mt-3">
+<!-- 본문 래퍼 -->
+<div class="main-wrapper">
 
-    <!-- ===== 사용자 관리 탭 ===== -->
-    <div class="tab-pane fade show active" id="tab-users">
+  <!-- 좌측 사이드바 -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-section-title">메뉴</div>
+    <nav class="sidebar-nav">
+      <a class="sidebar-link active" id="menu-users" onclick="showPage('users')">
+        <i class="bi bi-people"></i>사용자 관리
+      </a>
+      <a class="sidebar-link" id="menu-admin" onclick="showPage('admin')" style="display:none">
+        <i class="bi bi-gear"></i>관리자 설정
+      </a>
+    </nav>
+  </aside>
+
+  <!-- 콘텐츠 영역 -->
+  <main class="content-area" id="contentArea">
+
+    <!-- ===== 사용자 관리 페이지 ===== -->
+    <div id="page-users">
+      <div class="page-title">사용자 관리</div>
 
       <!-- 검색 조건 -->
       <div class="card shadow-sm mb-3">
@@ -47,21 +60,28 @@
           <div class="row g-2 align-items-end">
             <div class="col-md-3">
               <label class="form-label small fw-semibold mb-1">계정 (ID)</label>
-              <input id="srchAccount" type="text" class="form-control form-control-sm" placeholder="계정명 입력" />
+              <input id="srchAccount" type="text" class="form-control form-control-sm" placeholder="계정명 (비어있으면 전체)" />
             </div>
             <div class="col-md-3">
               <label class="form-label small fw-semibold mb-1">이름</label>
-              <input id="srchName" type="text" class="form-control form-control-sm" placeholder="이름 입력" />
+              <input id="srchName" type="text" class="form-control form-control-sm" placeholder="이름 (비어있으면 전체)" />
             </div>
-            <div class="col-md-4">
+            <div class="col-md-3">
               <label class="form-label small fw-semibold mb-1">소속 그룹</label>
-              <select id="srchGroup" class="form-select form-select-sm">
-                <option value="">전체</option>
-              </select>
+              <input id="srchGroup" type="text" class="form-control form-control-sm" placeholder="그룹명 입력" />
             </div>
             <div class="col-md-2">
-              <button class="btn btn-primary btn-sm w-100" onclick="searchUsers()">
-                <i class="bi bi-search me-1"></i>조회
+              <label class="form-label small fw-semibold mb-1">상태</label>
+              <select id="srchStatus" class="form-select form-select-sm">
+                <option value="">전체</option>
+                <option value="active">활성</option>
+                <option value="inactive">비활성</option>
+              </select>
+            </div>
+            <div class="col-md-1">
+              <label class="form-label small fw-semibold mb-1">&nbsp;</label>
+              <button class="btn btn-primary btn-sm w-100 d-block" onclick="searchUsers()">
+                <i class="bi bi-search"></i>
               </button>
             </div>
           </div>
@@ -69,7 +89,7 @@
       </div>
 
       <!-- 그리드 -->
-      <div class="card shadow-sm">
+      <div class="card shadow-sm" id="resultCard">
         <div class="card-header py-2 d-flex justify-content-between align-items-center bg-light">
           <span class="small fw-semibold text-muted">조회 결과</span>
           <span id="resultCount" class="badge bg-secondary">0건</span>
@@ -79,29 +99,31 @@
             <table class="table table-hover table-bordered mb-0 small">
               <thead class="table-primary">
                 <tr>
-                  <th style="width:200px">계정 (ID)</th>
+                  <th>계정 (ID)</th>
                   <th style="width:120px">이름</th>
-                  <th style="width:150px">부서</th>
-                  <th style="width:120px">직위</th>
-                  <th style="width:100px">직급</th>
+                  <th class="d-none d-md-table-cell" style="width:150px">부서</th>
+                  <th class="d-none d-md-table-cell" style="width:120px">직위</th>
+                  <th class="d-none d-md-table-cell" style="width:100px">직급</th>
                   <th style="width:80px" class="text-center">상태</th>
                 </tr>
               </thead>
               <tbody id="userTableBody">
-                <tr id="emptyRow">
+                <tr>
                   <td colspan="6" class="text-center text-muted py-4">
-                    <i class="bi bi-search me-1"></i>조회 조건을 입력하고 조회 버튼을 클릭하세요.
+                    <i class="bi bi-arrow-up-circle me-1"></i>조회 버튼을 클릭하면 전체 사용자가 조회됩니다.
                   </td>
                 </tr>
               </tbody>
             </table>
           </div>
         </div>
+        <div class="card-footer bg-white py-2" id="paginationArea"></div>
       </div>
     </div>
 
-    <!-- ===== 관리자 설정 탭 ===== -->
-    <div class="tab-pane fade" id="tab-admin">
+    <!-- ===== 관리자 설정 페이지 ===== -->
+    <div id="page-admin" style="display:none">
+      <div class="page-title">관리자 설정</div>
       <div class="card shadow-sm">
         <div class="card-header py-2 d-flex justify-content-between align-items-center bg-light">
           <span class="small fw-semibold text-muted">관리자 목록</span>
@@ -125,7 +147,7 @@
       </div>
     </div>
 
-  </div>
+  </main>
 </div>
 
 <!-- ===== 사용자 상세 모달 ===== -->
@@ -138,7 +160,6 @@
       </div>
       <div class="modal-body">
         <div class="row">
-          <!-- 기본 정보 -->
           <div class="col-md-6 border-end">
             <h6 class="text-muted fw-semibold mb-3 small text-uppercase">기본 정보</h6>
             <table class="table table-sm table-borderless mb-0">
@@ -150,11 +171,8 @@
               <tr><td class="text-muted small">상태</td><td id="d_status"></td></tr>
             </table>
           </div>
-          <!-- 작업 -->
           <div class="col-md-6">
             <h6 class="text-muted fw-semibold mb-3 small text-uppercase">작업</h6>
-
-            <!-- 비밀번호 초기화 -->
             <div id="pwSection" class="mb-3 p-3 bg-light rounded">
               <div class="small fw-semibold mb-2"><i class="bi bi-key me-1 text-primary"></i>비밀번호 초기화</div>
               <div class="form-check mb-1">
@@ -165,21 +183,16 @@
                 <input class="form-check-input" type="radio" name="pwType" id="pwCustom" value="custom" onchange="togglePwInput()"/>
                 <label class="form-check-label small" for="pwCustom">직접 입력</label>
               </div>
-              <input id="customPwInput" type="text" class="form-control form-control-sm mb-2 d-none"
-                     placeholder="새 비밀번호 입력" />
+              <input id="customPwInput" type="text" class="form-control form-control-sm mb-2 d-none" placeholder="새 비밀번호 입력" />
               <button class="btn btn-sm btn-primary w-100" onclick="doResetPassword()">
                 <i class="bi bi-key me-1"></i>초기화 실행
               </button>
             </div>
-
-            <!-- 잠금 해제 -->
             <div id="unlockSection" class="mb-2">
               <button class="btn btn-sm btn-warning w-100" onclick="doUnlock()">
                 <i class="bi bi-unlock me-1"></i>계정 잠금 해제
               </button>
             </div>
-
-            <!-- 계정 사용 안함 -->
             <div id="disableSection">
               <button class="btn btn-sm btn-danger w-100" onclick="doDisable()">
                 <i class="bi bi-person-x me-1"></i>계정 사용 안함
@@ -192,7 +205,7 @@
   </div>
 </div>
 
-<!-- ===== 비밀번호 초기화 결과 모달 ===== -->
+<!-- ===== 비밀번호 결과 모달 ===== -->
 <div class="modal fade" id="pwResultModal" tabindex="-1">
   <div class="modal-dialog modal-dialog-centered modal-sm">
     <div class="modal-content">
@@ -239,12 +252,19 @@
             <input id="opPassword" type="password" class="form-control form-control-sm" />
           </div>
           <div class="col-12">
-            <label class="form-label small fw-semibold">권한</label>
-            <div class="d-flex flex-wrap gap-3 mt-1">
-              <div class="form-check"><input class="form-check-input" type="checkbox" id="perm_reset" value="reset_password"><label class="form-check-label small" for="perm_reset">비밀번호 초기화</label></div>
-              <div class="form-check"><input class="form-check-input" type="checkbox" id="perm_unlock" value="unlock"><label class="form-check-label small" for="perm_unlock">잠금 해제</label></div>
-              <div class="form-check"><input class="form-check-input" type="checkbox" id="perm_disable" value="disable"><label class="form-check-label small" for="perm_disable">계정 비활성화</label></div>
-              <div class="form-check"><input class="form-check-input" type="checkbox" id="perm_admin" value="admin"><label class="form-check-label small" for="perm_admin">관리자 설정</label></div>
+            <label class="form-label small fw-semibold">메뉴 접근 권한</label>
+            <div class="d-flex flex-wrap gap-3 mt-1 p-2 bg-light rounded">
+              <div class="form-check"><input class="form-check-input" type="checkbox" id="perm_menu_users"><label class="form-check-label small" for="perm_menu_users"><i class="bi bi-people me-1"></i>사용자 관리</label></div>
+              <div class="form-check"><input class="form-check-input" type="checkbox" id="perm_menu_admin"><label class="form-check-label small" for="perm_menu_admin"><i class="bi bi-gear me-1"></i>관리자 설정</label></div>
+            </div>
+          </div>
+          <div class="col-12">
+            <label class="form-label small fw-semibold">기능 권한</label>
+            <div class="d-flex flex-wrap gap-3 mt-1 p-2 bg-light rounded">
+              <div class="form-check"><input class="form-check-input" type="checkbox" id="perm_reset"><label class="form-check-label small" for="perm_reset">비밀번호 초기화</label></div>
+              <div class="form-check"><input class="form-check-input" type="checkbox" id="perm_unlock"><label class="form-check-label small" for="perm_unlock">잠금 해제</label></div>
+              <div class="form-check"><input class="form-check-input" type="checkbox" id="perm_disable"><label class="form-check-label small" for="perm_disable">계정 비활성화</label></div>
+              <div class="form-check"><input class="form-check-input" type="checkbox" id="perm_admin"><label class="form-check-label small" for="perm_admin">관리자 설정 접근</label></div>
             </div>
           </div>
         </div>

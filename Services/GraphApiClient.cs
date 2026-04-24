@@ -38,12 +38,14 @@ public class GraphApiClient
         return result.AccessToken;
     }
 
-    private async Task<HttpResponseMessage> SendAsync(HttpMethod method, string url, object body = null)
+    private async Task<HttpResponseMessage> SendAsync(HttpMethod method, string url, object body = null, bool eventual = false)
     {
         var token = await GetTokenAsync();
         var request = new HttpRequestMessage(method, GraphBase + url);
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+        if (eventual)
+            request.Headers.Add("ConsistencyLevel", "eventual");
 
         if (body != null)
         {
@@ -58,70 +60,95 @@ public class GraphApiClient
 
     private const string UserSelect = "id,displayName,userPrincipalName,accountEnabled,department,jobTitle,title";
 
-    // 사용자 검색 (계정 / 이름 / 소속그룹)
-    public async Task<string> SearchUsersAsync(string account, string name, string groupId)
+    // 사용자 검색 (계정 / 이름 / 그룹명) - contains (LIKE) 방식
+    public async Task<string> SearchUsersAsync(string account, string name, string groupName, string status = null)
     {
-        string url;
+        var statusFilter = status == "active"   ? "accountEnabled eq true"
+                         : status == "inactive" ? "accountEnabled eq false"
+                         : null;
 
-        if (!string.IsNullOrWhiteSpace(groupId))
+        // 조건 없으면 전체 조회
+        if (string.IsNullOrWhiteSpace(account) &&
+            string.IsNullOrWhiteSpace(name) &&
+            string.IsNullOrWhiteSpace(groupName))
         {
-            // 그룹 멤버 조회 후 계정/이름 필터는 C#에서 처리
-            url = $"/groups/{groupId}/members/microsoft.graph.user?$select={UserSelect}&$top=100";
-        }
-        else
-        {
-            var filters = new List<string>();
-            if (!string.IsNullOrWhiteSpace(account))
-                filters.Add($"startsWith(userPrincipalName,'{Esc(account)}')");
-            if (!string.IsNullOrWhiteSpace(name))
-                filters.Add($"startsWith(displayName,'{Esc(name)}')");
-            if (filters.Count == 0)
-                return "{\"value\":[]}";
-
-            url = $"/users?$filter={string.Join(" or ", filters)}&$select={UserSelect}&$top=50";
+            var allUrl = statusFilter != null
+                ? $"/users?$filter={statusFilter}&$select={UserSelect}&$top=100"
+                : $"/users?$select={UserSelect}&$top=100";
+            var all = await SendAsync(HttpMethod.Get, allUrl);
+            return await all.Content.ReadAsStringAsync();
         }
 
-        var res = await SendAsync(HttpMethod.Get, url);
-        var json = await res.Content.ReadAsStringAsync();
-
-        // 그룹 조회 후 계정/이름 추가 필터 (C#)
-        if (!string.IsNullOrWhiteSpace(groupId) &&
-            (!string.IsNullOrWhiteSpace(account) || !string.IsNullOrWhiteSpace(name)))
+        // 그룹명 검색: 그룹 찾고 → 멤버 조회
+        if (!string.IsNullOrWhiteSpace(groupName))
         {
-            json = FilterGroupMembers(json, account, name);
-        }
-
-        return json;
-    }
-
-    private string FilterGroupMembers(string json, string account, string name)
-    {
-        using (var doc = JsonDocument.Parse(json))
-        {
-            var filtered = new List<JsonElement>();
-            foreach (var u in doc.RootElement.GetProperty("value").EnumerateArray())
+            var groupJson = await SearchGroupsByNameAsync(groupName);
+            using (var doc = JsonDocument.Parse(groupJson))
             {
-                var upn = u.TryGetProperty("userPrincipalName", out var v1) ? v1.GetString() ?? "" : "";
-                var dn  = u.TryGetProperty("displayName", out var v2) ? v2.GetString() ?? "" : "";
+                if (!doc.RootElement.TryGetProperty("value", out var groups))
+                    return "{\"value\":[]}";
 
-                bool match = true;
-                if (!string.IsNullOrWhiteSpace(account))
-                    match &= upn.StartsWith(account, StringComparison.OrdinalIgnoreCase);
-                if (!string.IsNullOrWhiteSpace(name))
-                    match &= dn.StartsWith(name, StringComparison.OrdinalIgnoreCase);
+                var allUsers = new List<JsonElement>();
+                foreach (var g in groups.EnumerateArray())
+                {
+                    var gid = g.GetProperty("id").GetString();
+                    var membersJson = await SendAsync(HttpMethod.Get,
+                        $"/groups/{gid}/members/microsoft.graph.user?$select={UserSelect}&$top=100");
+                    var membersText = await membersJson.Content.ReadAsStringAsync();
 
-                if (match) filtered.Add(u);
+                    using (var md = JsonDocument.Parse(membersText))
+                    {
+                        if (!md.RootElement.TryGetProperty("value", out var members)) continue;
+                        foreach (var u in members.EnumerateArray())
+                            allUsers.Add(u.Clone());
+                    }
+                }
+
+                // 계정/이름 추가 필터 (C#)
+                var filtered = FilterUsers(allUsers, account, name, statusFilter);
+                return JsonSerializer.Serialize(new { value = filtered });
             }
-
-            var result = new { value = filtered };
-            return JsonSerializer.Serialize(result);
         }
+
+        // 계정/이름 $search 검색 (LIKE 방식, ConsistencyLevel: eventual 필요)
+        var terms = new List<string>();
+        if (!string.IsNullOrWhiteSpace(account))
+            terms.Add($"\"userPrincipalName:{Esc(account)}\"");
+        if (!string.IsNullOrWhiteSpace(name))
+            terms.Add($"\"displayName:{Esc(name)}\"");
+        if (terms.Count == 0)
+            return "{\"value\":[]}";
+
+        var search = Uri.EscapeDataString(string.Join(" OR ", terms));
+        var url    = $"/users?$search={search}&$select={UserSelect}&$top=50&$count=true";
+        if (statusFilter != null)
+            url += $"&$filter={statusFilter}";
+        var res = await SendAsync(HttpMethod.Get, url, eventual: true);
+        return await res.Content.ReadAsStringAsync();
     }
 
-    // 그룹 목록
-    public async Task<string> GetGroupsAsync()
+    private List<JsonElement> FilterUsers(List<JsonElement> users, string account, string name, string statusFilter)
     {
-        var res = await SendAsync(HttpMethod.Get, "/groups?$select=id,displayName&$top=100");
+        return users.FindAll(u => {
+            var upn     = u.TryGetProperty("userPrincipalName", out var v1) ? v1.GetString() ?? "" : "";
+            var dn      = u.TryGetProperty("displayName",       out var v2) ? v2.GetString() ?? "" : "";
+            var enabled = u.TryGetProperty("accountEnabled",    out var v3) && v3.GetBoolean();
+            bool match  = true;
+            if (!string.IsNullOrWhiteSpace(account))
+                match &= upn.IndexOf(account, StringComparison.OrdinalIgnoreCase) >= 0;
+            if (!string.IsNullOrWhiteSpace(name))
+                match &= dn.IndexOf(name, StringComparison.OrdinalIgnoreCase) >= 0;
+            if (statusFilter == "accountEnabled eq true")  match &= enabled;
+            if (statusFilter == "accountEnabled eq false") match &= !enabled;
+            return match;
+        });
+    }
+
+    // 그룹명으로 그룹 검색
+    public async Task<string> SearchGroupsByNameAsync(string query)
+    {
+        var url = $"/groups?$filter=contains(displayName,'{Esc(query)}')&$select=id,displayName&$top=20&$count=true";
+        var res = await SendAsync(HttpMethod.Get, url, eventual: true);
         return await res.Content.ReadAsStringAsync();
     }
 
