@@ -1,0 +1,17 @@
+# Build output
+bin/
+obj/
+
+# Visual Studio
+.vs/
+*.user
+*.suo
+
+# appsettings - 민감 정보 포함 (Secret은 별도 관리)
+appsettings.json
+
+# 운영환경 설정은 별도 관리
+appsettings.Production.json
+
+# 로그
+*.log

@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dotnet run *)",
+      "Bash(dotnet --list-sdks)",
+      "Bash(dotnet --list-runtimes)",
+      "Read(//c/Program Files/dotnet/sdk/**)",
+      "Bash(where dotnet *)",
+      "Read(//c/Program Files/Microsoft Visual Studio/**)",
+      "Read(//c/Program Files \\(x86\\)/Microsoft Visual Studio/**)"
+    ]
+  }
+}

@@ -1,0 +1,16 @@
+body { background-color: #f0f2f5; }
+
+.navbar-brand { font-size: 1rem; letter-spacing: .02em; }
+
+.card { border: none; border-radius: 10px; }
+.card-header { border-radius: 10px 10px 0 0 !important; }
+
+.table th { font-size: .78rem; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+.table td { font-size: .85rem; vertical-align: middle; }
+.table tbody tr:hover { background-color: #f0f4ff; cursor: pointer; }
+
+.nav-tabs .nav-link { font-size: .88rem; color: #495057; }
+.nav-tabs .nav-link.active { font-weight: 600; }
+
+.font-monospace { letter-spacing: .1em; }
+.btn-xs { padding: 2px 8px; font-size: .78rem; }

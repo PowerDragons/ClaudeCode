@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>로그인 - Azure AD 관리</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
+  <style>
+    body { background: #1a3a5c; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+    .login-card { width: 380px; border-radius: 16px; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,.4); }
+    .login-header { background: linear-gradient(135deg, #0d6efd, #0a58ca); padding: 32px; text-align: center; color: white; }
+    .login-header i { font-size: 2.5rem; }
+    .login-body { padding: 32px; background: white; }
+    .form-control:focus { border-color: #0d6efd; box-shadow: 0 0 0 .2rem rgba(13,110,253,.15); }
+    .btn-login { background: linear-gradient(135deg, #0d6efd, #0a58ca); border: none; padding: 10px; font-size: 1rem; }
+  </style>
+</head>
+<body>
+  <div class="login-card">
+    <div class="login-header">
+      <i class="bi bi-shield-lock-fill d-block mb-2"></i>
+      <h5 class="mb-0 fw-bold">Azure AD 사용자 관리</h5>
+      <small class="opacity-75">관리자 로그인</small>
+    </div>
+    <div class="login-body">
+      <div id="errorMsg" class="alert alert-danger d-none py-2 small"></div>
+      <div class="mb-3">
+        <label class="form-label fw-semibold small">아이디</label>
+        <div class="input-group">
+          <span class="input-group-text"><i class="bi bi-person"></i></span>
+          <input id="username" type="text" class="form-control" placeholder="관리자 아이디" />
+        </div>
+      </div>
+      <div class="mb-4">
+        <label class="form-label fw-semibold small">비밀번호</label>
+        <div class="input-group">
+          <span class="input-group-text"><i class="bi bi-lock"></i></span>
+          <input id="password" type="password" class="form-control" placeholder="비밀번호" />
+        </div>
+      </div>
+      <button id="loginBtn" class="btn btn-login btn-primary w-100 text-white fw-semibold" onclick="doLogin()">
+        <i class="bi bi-box-arrow-in-right me-2"></i>로그인
+      </button>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    document.addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+
+    async function doLogin() {
+      const username = document.getElementById('username').value.trim();
+      const password = document.getElementById('password').value;
+      const errDiv   = document.getElementById('errorMsg');
+      const btn      = document.getElementById('loginBtn');
+
+      if (!username || !password) {
+        errDiv.textContent = '아이디와 비밀번호를 입력하세요.';
+        errDiv.classList.remove('d-none');
+        return;
+      }
+
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>로그인 중...';
+
+      try {
+        const res  = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password })
+        });
+        const data = await res.json();
+
+        if (!res.ok) {
+          errDiv.textContent = data.error || '로그인 실패';
+          errDiv.classList.remove('d-none');
+          return;
+        }
+
+        location.href = '/index.html';
+      } catch {
+        errDiv.textContent = '서버 연결 오류';
+        errDiv.classList.remove('d-none');
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-box-arrow-in-right me-2"></i>로그인';
+      }
+    }
+  </script>
+</body>
+</html>

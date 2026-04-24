@@ -1,0 +1,9 @@
+[
+  {
+    "id": "1",
+    "username": "admin",
+    "password": "admin1234!",
+    "displayName": "시스템 관리자",
+    "permissions": ["reset_password", "unlock", "disable", "admin"]
+  }
+]
