@@ -37,7 +37,15 @@ function toggleSidebar() {
 // ── 페이지 전환 ───────────────────────────────────────────────────────────────
 function showPage(page) {
   ['users', 'admin'].forEach(p => {
-    document.getElementById('page-' + p).style.display  = p === page ? '' : 'none';
+    const el = document.getElementById('page-' + p);
+    if (p === page) {
+      el.style.display = '';
+      el.classList.remove('page-enter');
+      void el.offsetWidth;           // reflow → 애니메이션 재실행
+      el.classList.add('page-enter');
+    } else {
+      el.style.display = 'none';
+    }
     document.getElementById('menu-' + p)?.classList.toggle('active', p === page);
   });
   if (window.innerWidth >= 768) {
@@ -114,6 +122,16 @@ async function searchUsers() {
   if (groupName) params.set('groupName', groupName);
   if (status)    params.set('status',    status);
 
+  const btn   = document.getElementById('btnSearch');
+  const tbody = document.getElementById('userTableBody');
+  btn.disabled = true;
+
+  tbody.innerHTML = `<tr><td colspan="6" class="text-center py-5">
+    <div class="spinner-border text-primary" style="width:2.5rem;height:2.5rem" role="status"></div>
+  </td></tr>`;
+
+  await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+
   try {
     const res  = await fetch('/api/users/search?' + params.toString());
     const data = await res.json();
@@ -121,6 +139,9 @@ async function searchUsers() {
     renderUsers(data);
   } catch {
     showToast('서버 연결 오류', 'danger');
+    tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3">오류가 발생했습니다.</td></tr>';
+  } finally {
+    btn.disabled = false;
   }
 }
 
@@ -188,9 +209,10 @@ function renderPage() {
     return;
   }
 
-  pageData.forEach(u => {
+  const rows = pageData.map((u, i) => {
     const tr = document.createElement('tr');
     tr.style.cursor = 'pointer';
+    tr.style.animationDelay = `${i * 30}ms`;
     tr.innerHTML = `
       <td class="small">${esc(u.userPrincipalName)}</td>
       <td class="small fw-semibold">${esc(u.displayName)}</td>
@@ -204,7 +226,12 @@ function renderPage() {
       </td>`;
     tr.addEventListener('dblclick', () => openUserDetail(u));
     tbody.appendChild(tr);
+    return tr;
   });
+
+  // DOM 추가 후 reflow 강제 → 애니메이션 초기 프레임 보장
+  void tbody.offsetHeight;
+  rows.forEach(tr => tr.classList.add('row-enter'));
 
   renderPagination(currentPage, totalPages, total);
 }
